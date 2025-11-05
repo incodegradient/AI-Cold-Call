@@ -1,0 +1,69 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AetherDial AI Campaign Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      /* Custom font not available on Google Fonts, so we define a fallback */
+      @font-face {
+        font-family: 'Momo Trust Display';
+        src: local('Arial'), sans-serif; /* Fallback font */
+        font-weight: 700;
+      }
+      body {
+        font-family: 'Inter Tight', sans-serif;
+        background-color: #0D1117;
+        color: #C9D1D9;
+      }
+      .font-display {
+        font-family: 'Momo Trust Display', 'Inter Tight', sans-serif;
+      }
+    </style>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter Tight', 'sans-serif'],
+              display: ['Momo Trust Display', 'Inter Tight', 'sans-serif'],
+            },
+            colors: {
+              'background': '#0D1117',
+              'surface': '#161B22',
+              'primary': '#58A6FF',
+              'primary-hover': '#79B8FF',
+              'secondary': '#238636',
+              'secondary-hover': '#2EA043',
+              'border': '#30363D',
+              'text-primary': '#C9D1D9',
+              'text-secondary': '#8B949E',
+              'danger': '#F85149',
+            },
+          },
+        },
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+    "@heroicons/react/": "https://aistudiocdn.com/@heroicons/react@^2.2.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
