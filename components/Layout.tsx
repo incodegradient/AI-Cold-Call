@@ -1,6 +1,4 @@
-
 import React from 'react';
-// Fix: Import useAuth from App.tsx instead of App
 import { useAuth } from '../App';
 import { Page } from '../types';
 import {
@@ -17,6 +15,7 @@ import {
 interface LayoutProps {
   children: React.ReactNode;
   onNavigate: (page: Page) => void;
+  currentPage: Page;
 }
 
 const navItems = [
@@ -32,9 +31,17 @@ const settingsNav = [
     { page: Page.Settings, label: 'Settings', icon: CogIcon },
 ]
 
-const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
+const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const { user, logout } = useAuth();
   
+  const getNavClassName = (page: Page) => {
+    const baseClasses = "w-full flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors";
+    if (currentPage === page) {
+        return `${baseClasses} bg-primary/10 text-primary`;
+    }
+    return `${baseClasses} text-text-secondary hover:bg-border hover:text-text-primary`;
+  }
+
   return (
     <div className="flex h-screen bg-background text-text-primary">
       <aside className="w-64 flex-shrink-0 bg-surface border-r border-border flex flex-col">
@@ -46,7 +53,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
                 <button
                     key={item.label}
                     onClick={() => onNavigate(item.page)}
-                    className="w-full flex items-center px-4 py-2.5 text-sm font-medium text-text-secondary rounded-lg hover:bg-border hover:text-text-primary transition-colors"
+                    className={getNavClassName(item.page)}
                 >
                     <item.icon className="w-5 h-5 mr-3" />
                     {item.label}
@@ -58,21 +65,21 @@ const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
                 <button
                     key={item.label}
                     onClick={() => onNavigate(item.page)}
-                    className="w-full flex items-center px-4 py-2.5 text-sm font-medium text-text-secondary rounded-lg hover:bg-border hover:text-text-primary transition-colors mb-2"
+                    className={`${getNavClassName(item.page)} mb-2`}
                 >
                     <item.icon className="w-5 h-5 mr-3" />
                     {item.label}
                 </button>
             ))}
-            <div className="flex items-center p-2">
+            <div className="flex items-center p-2 rounded-lg hover:bg-border transition-colors">
                 <div className="w-9 h-9 rounded-full bg-border flex items-center justify-center font-bold text-primary-hover">
-                    {user?.name.charAt(0)}
+                    {user?.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="ml-3">
                     <p className="text-sm font-semibold">{user?.name}</p>
-                    <p className="text-xs text-text-secondary">{user?.email}</p>
+                    <p className="text-xs text-text-secondary">{user?.role}</p>
                 </div>
-                <button onClick={logout} className="ml-auto text-text-secondary hover:text-text-primary p-2 rounded-md">
+                <button onClick={logout} className="ml-auto text-text-secondary hover:text-danger p-2 rounded-md">
                     <ArrowLeftOnRectangleIcon className="w-5 h-5"/>
                 </button>
             </div>

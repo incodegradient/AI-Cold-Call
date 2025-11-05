@@ -1,7 +1,22 @@
+// FIX: Implemented full type definitions based on usage in other components.
+
+export enum Page {
+  Landing = 'LANDING',
+  Login = 'LOGIN',
+  Signup = 'SIGNUP',
+  Dashboard = 'DASHBOARD',
+  Connections = 'CONNECTIONS',
+  Agents = 'AGENTS',
+  Leads = 'LEADS',
+  Campaigns = 'CAMPAIGNS',
+  Reports = 'REPORTS',
+  Settings = 'SETTINGS',
+}
+
 export enum Role {
-  Owner = 'Owner',
-  Admin = 'Admin',
-  Member = 'Member',
+    Owner = 'Owner',
+    Admin = 'Admin',
+    Member = 'Member',
 }
 
 export interface User {
@@ -12,98 +27,63 @@ export interface User {
 }
 
 export enum ConnectionProvider {
-  Vapi = 'Vapi',
-  RetellAI = 'Retell AI',
-  Twilio = 'Twilio',
-  CalCom = 'Cal.com',
-  OpenAI = 'OpenAI',
-  Gmail = 'Gmail',
+    CalCom = 'Cal.com',
+    Gmail = 'Gmail',
+    Twilio = 'Twilio',
+    Vapi = 'Vapi',
+    RetellAI = 'Retell AI',
+    OpenAI = 'OpenAI',
 }
 
 export interface Connection {
-  id: string;
-  provider: ConnectionProvider;
-  isConnected: boolean;
-  apiKey?: string;
-  eventType?: string;
-  clientId?: string;
-  clientSecret?: string;
-  accountSid?: string;
-  authToken?: string;
-  phoneNumber?: string;
+    id: string;
+    provider: ConnectionProvider;
+    isConnected: boolean;
+    apiKey?: string;
+    eventType?: string;
+    clientId?: string;
+    clientSecret?: string;
+    accountSid?: string;
+    authToken?: string;
+    phoneNumber?: string;
 }
 
 export enum AgentPlatform {
-  Vapi = 'Vapi',
-  Retell = 'Retell AI',
+    Vapi = 'Vapi',
+    Retell = 'Retell AI',
 }
 
 export interface Agent {
-  id: string;
-  name: string;
-  platform: AgentPlatform;
-  isActive: boolean;
-  prompt: string;
-  voiceId: string;
-  calls: number;
-  avgDuration: number;
-  bookingRate: number;
+    id: string;
+    name: string;
+    platform: AgentPlatform;
+    isActive: boolean;
+    providerAgentId: string;
+    calls: number;
+    avgDuration: number;
+    bookingRate: number;
 }
 
-export enum LeadStatus {
-  New = 'New',
-  Queued = 'Queued',
-  Called = 'Called',
-  Scheduled = 'Scheduled',
-  DoNotCall = 'Do-Not-Call',
-  Error = 'Error',
-}
-
-export interface Lead {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  city: string;
-  where: string;
-  industries: string[];
-  status: LeadStatus;
-}
-
-export interface Campaign {
-  id: string;
-  name: string;
-  platform: AgentPlatform;
-  agentId: string;
-  leadListId: string;
-  status: 'Draft' | 'Active' | 'Paused' | 'Completed';
-  schedule: {
-    start: string;
-    end: string;
-    weekdays: number[];
-  };
-  pacing: {
-    gapMinutes: number;
-    maxConcurrent: number;
-  };
-  stats: {
+export interface CampaignStats {
     totalLeads: number;
     attempted: number;
     connected: number;
-    avgTalkTime: number;
     bookings: number;
-  };
 }
 
-export enum Page {
-  Landing,
-  Login,
-  Signup,
-  Dashboard,
-  Connections,
-  Agents,
-  Leads,
-  Campaigns,
-  Reports,
-  Settings
+export interface Campaign {
+    id: string;
+    name: string;
+    status: 'Active' | 'Paused' | 'Completed';
+    agentId: string;
+    stats: CampaignStats;
+}
+
+export interface Lead {
+    id: string;
+    name: string;
+    phone: string;
+    status: 'New' | 'Attempted' | 'Connected' | 'Booked' | 'DNC';
+    lastAttempt: string | null;
+    campaign: string;
 }
