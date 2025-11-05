@@ -1,8 +1,10 @@
-import React, { useState, createContext, useContext, useMemo, useEffect } from 'react';
-import { Page, User, Role, Connection, Agent, Lead, Campaign, LeadGroup } from './types';
+import React, { useState, createContext, useContext, useEffect, useMemo } from 'react';
+import { Page, User, Connection, Agent, Lead, Campaign, LeadGroup } from './types';
+import * as api from './apiService';
+
+import Layout from './components/Layout';
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
-import Layout from './components/Layout';
 import DashboardScreen from './screens/DashboardScreen';
 import ConnectionsScreen from './screens/ConnectionsScreen';
 import AgentsScreen from './screens/AgentsScreen';
@@ -10,165 +12,140 @@ import LeadsScreen from './screens/LeadsScreen';
 import CampaignsScreen from './screens/CampaignsScreen';
 import ReportsScreen from './screens/ReportsScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import { mockConnections, mockAgents, mockLeads, mockCampaigns, mockUsers, mockLeadGroups } from './mockData';
 
-// --- Helper for localStorage ---
-function useLocalStorage<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const [storedValue, setStoredValue] = useState<T>(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      console.error(error);
-      return initialValue;
-    }
-  });
+// Auth Context
+interface AuthContextType {
+  user: User | null;
+  login: (email: string, pass: string) => Promise<void>;
+  logout: () => void;
+}
+const AuthContext = createContext<AuthContextType>(null!);
+export const useAuth = () => useContext(AuthContext);
 
-  const setValue: React.Dispatch<React.SetStateAction<T>> = (value) => {
+// Data Context
+interface DataContextType {
+    connections: Connection[];
+    agents: Agent[];
+    leads: Lead[];
+    campaigns: Campaign[];
+    leadGroups: LeadGroup[];
+    users: User[];
+    loading: boolean;
+    refreshData: () => void;
+}
+const DataContext = createContext<DataContextType>(null!);
+export const useData = () => useContext(DataContext);
+
+const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [currentPage, setCurrentPage] = useState<Page>(Page.Landing);
+  const [loading, setLoading] = useState(true);
+
+  // Data State
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [leadGroups, setLeadGroups] = useState<LeadGroup[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        const [connectionsData, agentsData, leadsData, campaignsData, leadGroupsData, usersData] = await Promise.all([
+            api.getConnections(),
+            api.getAgents(),
+            api.getLeads(),
+            api.getCampaigns(),
+            api.getLeadGroups(),
+            api.getUsers(),
+        ]);
+        setConnections(connectionsData);
+        setAgents(agentsData);
+        setLeads(leadsData);
+        setCampaigns(campaignsData);
+        setLeadGroups(leadGroupsData);
+        setUsers(usersData);
     } catch (error) {
-      console.error(error);
+        console.error("Failed to fetch data:", error);
+    } finally {
+        setLoading(false);
     }
   };
 
-  return [storedValue, setValue];
-}
-
-
-// --- Auth Context ---
-interface AuthContextType {
-  user: User | null;
-  login: (user: User) => void;
-  logout: () => void;
-  updateUser: (user: User) => void;
-}
-
-const AuthContext = createContext<AuthContextType | null>(null);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-// --- Data Context ---
-interface DataContextType {
-    connections: Connection[];
-    setConnections: React.Dispatch<React.SetStateAction<Connection[]>>;
-    agents: Agent[];
-    setAgents: React.Dispatch<React.SetStateAction<Agent[]>>;
-    leads: Lead[];
-    setLeads: React.Dispatch<React.SetStateAction<Lead[]>>;
-    leadGroups: LeadGroup[];
-    setLeadGroups: React.Dispatch<React.SetStateAction<LeadGroup[]>>;
-    campaigns: Campaign[];
-    setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>>;
-    users: User[];
-    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
-}
-
-const DataContext = createContext<DataContextType | null>(null);
-
-export const useData = () => {
-    const context = useContext(DataContext);
-    if (!context) {
-        throw new Error('useData must be used within a DataProvider');
+  useEffect(() => {
+    if (user) {
+        fetchData();
     }
-    return context;
-}
+  }, [user]);
 
-
-const App: React.FC = () => {
-  const [user, setUser] = useLocalStorage<User | null>('aether-user', null);
-  const [currentPage, setCurrentPage] = useState<Page>(user ? Page.Dashboard : Page.Landing);
-  
-  // App-wide data state
-  const [connections, setConnections] = useLocalStorage<Connection[]>('aether-connections', mockConnections);
-  const [agents, setAgents] = useLocalStorage<Agent[]>('aether-agents', mockAgents);
-  const [leads, setLeads] = useLocalStorage<Lead[]>('aether-leads', mockLeads);
-  const [leadGroups, setLeadGroups] = useLocalStorage<LeadGroup[]>('aether-leadgroups', mockLeadGroups);
-  const [campaigns, setCampaigns] = useLocalStorage<Campaign[]>('aether-campaigns', mockCampaigns);
-  const [users, setUsers] = useLocalStorage<User[]>('aether-users', mockUsers);
-
-
-  const login = (userData: User) => {
-    setUser(userData);
-    setCurrentPage(Page.Dashboard);
+  const login = async (email: string, pass: string) => {
+    const loggedInUser = await api.login(email, pass);
+    if (loggedInUser) {
+        setUser(loggedInUser);
+        setCurrentPage(Page.Dashboard);
+    } else {
+        throw new Error('Invalid credentials');
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('aether-user');
     setCurrentPage(Page.Landing);
   };
-  
-  const updateUser = (updatedUserData: User) => {
-    setUser(updatedUserData);
-    setUsers(prevUsers => prevUsers.map(u => u.id === updatedUserData.id ? updatedUserData : u));
-  }
 
   const handleNavigate = (page: Page) => {
     setCurrentPage(page);
   };
 
-  const authContextValue = useMemo(() => ({ user, login, logout, updateUser }), [user]);
-  const dataContextValue = useMemo(() => ({ connections, setConnections, agents, setAgents, leads, setLeads, leadGroups, setLeadGroups, campaigns, setCampaigns, users, setUsers }), [connections, agents, leads, leadGroups, campaigns, users]);
+  const authContextValue = useMemo(() => ({ user, login, logout }), [user]);
+  const dataContextValue = useMemo(() => ({
+    connections,
+    agents,
+    leads,
+    campaigns,
+    leadGroups,
+    users,
+    loading,
+    refreshData: fetchData,
+  }), [connections, agents, leads, campaigns, leadGroups, users, loading]);
 
-
-  const renderContent = () => {
+  const renderPage = () => {
     if (!user) {
       switch (currentPage) {
         case Page.Login:
-          return <AuthScreen isLogin={true} onSwitch={() => handleNavigate(Page.Signup)} onNavigate={handleNavigate} />;
         case Page.Signup:
-          return <AuthScreen isLogin={false} onSwitch={() => handleNavigate(Page.Login)} onNavigate={handleNavigate} />;
-        case Page.Landing:
+          return <AuthScreen page={currentPage} onNavigate={handleNavigate} />;
         default:
           return <LandingScreen onNavigate={handleNavigate} />;
       }
     }
 
-    // Authenticated user content
-    let screenContent: React.ReactNode;
-    switch (currentPage) {
-        case Page.Dashboard:
-            screenContent = <DashboardScreen />;
-            break;
-        case Page.Connections:
-            screenContent = <ConnectionsScreen />;
-            break;
-        case Page.Agents:
-            screenContent = <AgentsScreen />;
-            break;
-        case Page.Leads:
-            screenContent = <LeadsScreen />;
-            break;
-        case Page.Campaigns:
-            screenContent = <CampaignsScreen />;
-            break;
-        case Page.Reports:
-            screenContent = <ReportsScreen />;
-            break;
-        case Page.Settings:
-            screenContent = <SettingsScreen />;
-            break;
-        default:
-            setCurrentPage(Page.Dashboard); // Fallback to dashboard
-            screenContent = <DashboardScreen />;
-    }
-    
-    return <Layout onNavigate={handleNavigate} currentPage={currentPage}>{screenContent}</Layout>;
+    const pageMap: Record<Page, React.ReactNode> = {
+      [Page.Dashboard]: <DashboardScreen />,
+      [Page.Connections]: <ConnectionsScreen />,
+      [Page.Agents]: <AgentsScreen />,
+      [Page.Leads]: <LeadsScreen />,
+      [Page.Campaigns]: <CampaignsScreen />,
+      [Page.Reports]: <ReportsScreen />,
+      [Page.Settings]: <SettingsScreen />,
+      // Fallbacks for auth pages if somehow accessed while logged in
+      [Page.Landing]: <DashboardScreen />,
+      [Page.Login]: <DashboardScreen />,
+      [Page.Signup]: <DashboardScreen />,
+    };
+
+    return (
+        <Layout onNavigate={handleNavigate} currentPage={currentPage}>
+            {loading ? <div className="text-center p-8">Loading...</div> : pageMap[currentPage]}
+        </Layout>
+    );
   };
-  
+
   return (
     <AuthContext.Provider value={authContextValue}>
         <DataContext.Provider value={dataContextValue}>
-            {renderContent()}
+            {renderPage()}
         </DataContext.Provider>
     </AuthContext.Provider>
   );

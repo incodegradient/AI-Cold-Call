@@ -1,140 +1,155 @@
 import React, { useState } from 'react';
 import { useData } from '../App';
 import { Connection, ConnectionProvider } from '../types';
+import { CheckCircleIcon, XCircleIcon, PencilIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import * as api from '../apiService';
 
-const ConnectionCard: React.FC<{ connection: Connection }> = ({ connection }) => {
-    const { connections, setConnections } = useData();
-    const [apiKey, setApiKey] = useState(connection.apiKey || '');
-    const [eventType, setEventType] = useState(connection.eventType || '');
-    const [clientId, setClientId] = useState(connection.clientId || '');
-    const [clientSecret, setClientSecret] = useState(connection.clientSecret || '');
-    const [accountSid, setAccountSid] = useState(connection.accountSid || '');
-    const [authToken, setAuthToken] = useState(connection.authToken || '');
-    const [phoneNumber, setPhoneNumber] = useState(connection.phoneNumber || '');
-    
-    const handleSave = () => {
-        const updatedConnection: Connection = {
-            ...connection,
-            isConnected: true,
-            apiKey, eventType, clientId, clientSecret, accountSid, authToken, phoneNumber
-        };
-        setConnections(connections.map(c => c.id === connection.id ? updatedConnection : c));
-        alert(`${connection.provider} connection saved!`);
+const providerDetails = {
+    [ConnectionProvider.Vapi]: { docs: '#' },
+    [ConnectionProvider.RetellAI]: { docs: '#' },
+    [ConnectionProvider.Twilio]: { docs: '#' },
+    [ConnectionProvider.CalCom]: { docs: '#' },
+    [ConnectionProvider.OpenAI]: { docs: '#' },
+    [ConnectionProvider.Gmail]: { docs: '#' },
+};
+
+const ConnectionCard: React.FC<{ connection: Connection, onEdit: (c: Connection) => void }> = ({ connection, onEdit }) => {
+    return (
+        <div className="bg-surface border border-border rounded-lg p-5 flex flex-col">
+            <div className="flex items-center">
+                {/* In a real app, you would have logos */}
+                <div className="w-10 h-10 bg-border rounded-full mr-4 flex-shrink-0"></div>
+                <div className="flex-grow">
+                    <h3 className="text-lg font-semibold text-text-primary">{connection.provider}</h3>
+                    <a href={providerDetails[connection.provider].docs} className="text-xs text-primary hover:underline">Read Docs</a>
+                </div>
+                <div className={`ml-auto text-xs font-semibold flex items-center flex-shrink-0 ${connection.isConnected ? 'text-green-400' : 'text-text-secondary'}`}>
+                    {connection.isConnected ? <CheckCircleIcon className="w-4 h-4 mr-1" /> : <XCircleIcon className="w-4 h-4 mr-1" />}
+                    {connection.isConnected ? 'Connected' : 'Not Connected'}
+                </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-border flex-grow">
+                <p className="text-sm text-text-secondary">
+                    {connection.isConnected ? 'Your account is successfully linked.' : 'Connect your account to enable this integration.'}
+                </p>
+            </div>
+            <button 
+                onClick={() => onEdit(connection)}
+                className="mt-4 w-full bg-primary/10 hover:bg-primary/20 text-primary font-semibold py-2 px-4 rounded-lg transition text-sm flex items-center justify-center"
+            >
+                <PencilIcon className="w-4 h-4 mr-2" />
+                {connection.isConnected ? 'Manage Connection' : 'Set Up Connection'}
+            </button>
+        </div>
+    );
+};
+
+const ConnectionsScreen: React.FC = () => {
+    const { connections, refreshData } = useData();
+    const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingConnection) return;
+        setIsSaving(true);
+        try {
+            await api.updateConnection(editingConnection);
+            refreshData();
+            setEditingConnection(null);
+        } catch (error) {
+            console.error('Failed to save connection', error);
+        } finally {
+            setIsSaving(false);
+        }
     };
+    
+    const renderFormFields = () => {
+        if (!editingConnection) return null;
 
-    const handleTest = () => {
-        if (connection.isConnected) {
-            alert(`Testing ${connection.provider}... Success!`);
-        } else {
-            alert(`Please save your credentials for ${connection.provider} first.`);
+        const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+            setEditingConnection({
+                ...editingConnection,
+                [e.target.name]: e.target.value
+            });
+        };
+
+        switch (editingConnection.provider) {
+            case ConnectionProvider.Vapi:
+            case ConnectionProvider.RetellAI:
+            case ConnectionProvider.OpenAI:
+                return <input name="apiKey" value={editingConnection.apiKey || ''} onChange={handleInputChange} placeholder="API Key" className="w-full bg-background border border-border rounded-md p-2" />;
+            case ConnectionProvider.Twilio:
+                return (
+                    <div className="space-y-4">
+                        <input name="accountSid" value={editingConnection.accountSid || ''} onChange={handleInputChange} placeholder="Account SID" className="w-full bg-background border border-border rounded-md p-2" />
+                        <input name="authToken" value={editingConnection.authToken || ''} onChange={handleInputChange} placeholder="Auth Token" className="w-full bg-background border border-border rounded-md p-2" />
+                        <input name="phoneNumber" value={editingConnection.phoneNumber || ''} onChange={handleInputChange} placeholder="Phone Number" className="w-full bg-background border border-border rounded-md p-2" />
+                    </div>
+                );
+            case ConnectionProvider.CalCom:
+                 return (
+                    <div className="space-y-4">
+                        <input name="apiKey" value={editingConnection.apiKey || ''} onChange={handleInputChange} placeholder="API Key" className="w-full bg-background border border-border rounded-md p-2" />
+                        <input name="eventType" value={editingConnection.eventType || ''} onChange={handleInputChange} placeholder="Event Type ID" className="w-full bg-background border border-border rounded-md p-2" />
+                    </div>
+                );
+            case ConnectionProvider.Gmail:
+                return (
+                    <div className="space-y-4">
+                         <input name="clientId" value={editingConnection.clientId || ''} onChange={handleInputChange} placeholder="Client ID" className="w-full bg-background border border-border rounded-md p-2" />
+                        <input name="clientSecret" value={editingConnection.clientSecret || ''} onChange={handleInputChange} placeholder="Client Secret" className="w-full bg-background border border-border rounded-md p-2" />
+                    </div>
+                )
+            default:
+                return <p>Configuration not available for this provider.</p>;
         }
     };
 
-    const isDirty = apiKey !== (connection.apiKey || '') ||
-                      eventType !== (connection.eventType || '') ||
-                      clientId !== (connection.clientId || '') ||
-                      clientSecret !== (connection.clientSecret || '') ||
-                      accountSid !== (connection.accountSid || '') ||
-                      authToken !== (connection.authToken || '') ||
-                      phoneNumber !== (connection.phoneNumber || '');
-
     return (
-        <div className="bg-surface border border-border rounded-lg p-6 flex flex-col space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-text-primary">{connection.provider}</h2>
-                <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${connection.isConnected ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                    {connection.isConnected ? 'Connected' : 'Not Connected'}
-                </span>
+        <div className="space-y-8">
+            <div>
+                <h1 className="text-3xl font-bold text-text-primary">Connections</h1>
+                <p className="text-text-secondary mt-1">Integrate your favorite tools with AetherDial.</p>
             </div>
-            
-            {connection.provider === ConnectionProvider.CalCom && (
-                 <>
-                    <div>
-                        <label className="text-sm font-medium text-text-secondary block mb-1.5" htmlFor={`apikey-${connection.id}`}>API Key (Cal.com)</label>
-                        <input id={`apikey-${connection.id}`} type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full bg-background border border-border rounded-md px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-                    </div>
-                     <div>
-                        <label className="text-sm font-medium text-text-secondary block mb-1.5" htmlFor={`eventtype-${connection.id}`}>Event Type ID (Cal.com)</label>
-                        <input id={`eventtype-${connection.id}`} type="text" value={eventType} onChange={e => setEventType(e.target.value)} className="w-full bg-background border border-border rounded-md px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-                    </div>
-                </>
-            )}
 
-            {connection.provider === ConnectionProvider.Gmail && (
-                 <>
-                    <div>
-                        <label className="text-sm font-medium text-text-secondary block mb-1.5" htmlFor={`clientid-${connection.id}`}>Client ID</label>
-                        <input id={`clientid-${connection.id}`} type="text" value={clientId} onChange={e => setClientId(e.target.value)} className="w-full bg-background border border-border rounded-md px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-                    </div>
-                     <div>
-                        <label className="text-sm font-medium text-text-secondary block mb-1.5" htmlFor={`clientsecret-${connection.id}`}>Client Secret</label>
-                        <input id={`clientsecret-${connection.id}`} type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} className="w-full bg-background border border-border rounded-md px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-                    </div>
-                </>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {connections.map(c => (
+                    <ConnectionCard key={c.id} connection={c} onEdit={setEditingConnection} />
+                ))}
+            </div>
 
-            {connection.provider === ConnectionProvider.Twilio && (
-                 <>
-                    <div>
-                        <label className="text-sm font-medium text-text-secondary block mb-1.5" htmlFor={`sid-${connection.id}`}>Account SID</label>
-                        <input id={`sid-${connection.id}`} type="text" value={accountSid} onChange={e => setAccountSid(e.target.value)} className="w-full bg-background border border-border rounded-md px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
+            {editingConnection && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingConnection(null)}>
+                    <div className="bg-surface rounded-lg shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-xl font-bold mb-4">Edit {editingConnection.provider} Connection</h2>
+                        <form onSubmit={handleSave} className="space-y-4">
+                            {renderFormFields()}
+                            <div className="flex items-center">
+                                <label className="flex items-center cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={editingConnection.isConnected} 
+                                        onChange={e => setEditingConnection({...editingConnection, isConnected: e.target.checked})}
+                                        className="sr-only peer" />
+                                    <div className="relative w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                    <span className="ms-3 text-sm font-medium text-text-primary">
+                                        {editingConnection.isConnected ? 'Connected' : 'Disconnected'}
+                                    </span>
+                                </label>
+                            </div>
+                            <div className="flex justify-end space-x-3 pt-4">
+                                <button type="button" onClick={() => setEditingConnection(null)} className="bg-border px-4 py-2 rounded-lg text-sm font-semibold">Cancel</button>
+                                <button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary-hover px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50">
+                                    {isSaving ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : 'Save'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    <div>
-                        <label className="text-sm font-medium text-text-secondary block mb-1.5" htmlFor={`token-${connection.id}`}>Auth Token</label>
-                        <input id={`token-${connection.id}`} type="password" value={authToken} onChange={e => setAuthToken(e.target.value)} className="w-full bg-background border border-border rounded-md px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-text-secondary block mb-1.5" htmlFor={`phone-${connection.id}`}>Twilio Phone Number</label>
-                        <input id={`phone-${connection.id}`} type="text" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} className="w-full bg-background border border-border rounded-md px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-                    </div>
-                </>
-            )}
-            
-            {[ConnectionProvider.Vapi, ConnectionProvider.RetellAI, ConnectionProvider.OpenAI].includes(connection.provider) && (
-                <div>
-                    <label className="text-sm font-medium text-text-secondary block mb-1.5" htmlFor={`apikey-${connection.id}`}>API Key</label>
-                    <input id={`apikey-${connection.id}`} type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full bg-background border border-border rounded-md px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
             )}
-
-
-            <div className="flex-grow"></div>
-            <div className="flex items-center space-x-2 pt-2">
-                <button 
-                    onClick={handleSave}
-                    disabled={!isDirty}
-                    className="w-full bg-secondary hover:bg-secondary-hover text-white font-semibold py-2 px-4 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed"
-                >
-                    Save
-                </button>
-                <button 
-                    onClick={handleTest}
-                    className="w-full bg-surface hover:bg-border text-text-primary font-semibold py-2 px-4 rounded-lg transition border border-border"
-                >
-                    Test
-                </button>
-            </div>
         </div>
-    )
-}
-
-const ConnectionsScreen: React.FC = () => {
-  const { connections } = useData();
-
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary">Connections</h1>
-        <p className="text-text-secondary mt-1">Manage your integrations with third-party services.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {connections.map(conn => (
-            <ConnectionCard key={conn.id} connection={conn} />
-        ))}
-      </div>
-    </div>
-  );
+    );
 };
 
 export default ConnectionsScreen;
