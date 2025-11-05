@@ -1,12 +1,8 @@
-// FIX: Implemented full App component with context providers and routing logic.
-
-import React, { useState, createContext, useContext, useMemo } from 'react';
-import { Page, User, Connection, Agent, Campaign, Lead } from './types';
-import { mockUsers, mockConnections, mockAgents, mockCampaigns, mockLeads } from './mockData';
-
-import Layout from './components/Layout';
+import React, { useState, createContext, useContext, useMemo, useEffect } from 'react';
+import { Page, User, Role, Connection, Agent, Lead, Campaign, LeadGroup } from './types';
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
+import Layout from './components/Layout';
 import DashboardScreen from './screens/DashboardScreen';
 import ConnectionsScreen from './screens/ConnectionsScreen';
 import AgentsScreen from './screens/AgentsScreen';
@@ -14,9 +10,35 @@ import LeadsScreen from './screens/LeadsScreen';
 import CampaignsScreen from './screens/CampaignsScreen';
 import ReportsScreen from './screens/ReportsScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import { mockConnections, mockAgents, mockLeads, mockCampaigns, mockUsers, mockLeadGroups } from './mockData';
+
+// --- Helper for localStorage ---
+function useLocalStorage<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error(error);
+      return initialValue;
+    }
+  });
+
+  const setValue: React.Dispatch<React.SetStateAction<T>> = (value) => {
+    try {
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return [storedValue, setValue];
+}
 
 
-// Auth Context
+// --- Auth Context ---
 interface AuthContextType {
   user: User | null;
   login: (user: User) => void;
@@ -25,6 +47,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -33,21 +56,24 @@ export const useAuth = () => {
   return context;
 };
 
-// Data Context
+// --- Data Context ---
 interface DataContextType {
-    users: User[];
-    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
     connections: Connection[];
     setConnections: React.Dispatch<React.SetStateAction<Connection[]>>;
     agents: Agent[];
     setAgents: React.Dispatch<React.SetStateAction<Agent[]>>;
-    campaigns: Campaign[];
-    setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>>;
     leads: Lead[];
     setLeads: React.Dispatch<React.SetStateAction<Lead[]>>;
+    leadGroups: LeadGroup[];
+    setLeadGroups: React.Dispatch<React.SetStateAction<LeadGroup[]>>;
+    campaigns: Campaign[];
+    setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>>;
+    users: User[];
+    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
+
 export const useData = () => {
     const context = useContext(DataContext);
     if (!context) {
@@ -56,93 +82,94 @@ export const useData = () => {
     return context;
 }
 
-// App Component
+
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [currentPage, setCurrentPage] = useState<Page>(Page.Landing);
-  const [isLoginView, setIsLoginView] = useState(true);
+  const [user, setUser] = useLocalStorage<User | null>('aether-user', null);
+  const [currentPage, setCurrentPage] = useState<Page>(user ? Page.Dashboard : Page.Landing);
+  
+  // App-wide data state
+  const [connections, setConnections] = useLocalStorage<Connection[]>('aether-connections', mockConnections);
+  const [agents, setAgents] = useLocalStorage<Agent[]>('aether-agents', mockAgents);
+  const [leads, setLeads] = useLocalStorage<Lead[]>('aether-leads', mockLeads);
+  const [leadGroups, setLeadGroups] = useLocalStorage<LeadGroup[]>('aether-leadgroups', mockLeadGroups);
+  const [campaigns, setCampaigns] = useLocalStorage<Campaign[]>('aether-campaigns', mockCampaigns);
+  const [users, setUsers] = useLocalStorage<User[]>('aether-users', mockUsers);
 
-  // Data states
-  const [users, setUsers] = useState<User[]>(mockUsers);
-  const [connections, setConnections] = useState<Connection[]>(mockConnections);
-  const [agents, setAgents] = useState<Agent[]>(mockAgents);
-  const [campaigns, setCampaigns] = useState<Campaign[]>(mockCampaigns);
-  const [leads, setLeads] = useState<Lead[]>(mockLeads);
 
-  const authContextValue = useMemo(() => ({
-    user,
-    login: (loggedInUser: User) => {
-      setUser(loggedInUser);
-      setCurrentPage(Page.Dashboard);
-    },
-    logout: () => {
-      setUser(null);
-      setCurrentPage(Page.Landing);
-    },
-    updateUser: (updatedUser: User) => {
-        setUser(updatedUser);
-        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-    }
-  }), [user]);
+  const login = (userData: User) => {
+    setUser(userData);
+    setCurrentPage(Page.Dashboard);
+  };
 
-  const dataContextValue = useMemo(() => ({
-    users, setUsers,
-    connections, setConnections,
-    agents, setAgents,
-    campaigns, setCampaigns,
-    leads, setLeads
-  }), [users, connections, agents, campaigns, leads]);
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('aether-user');
+    setCurrentPage(Page.Landing);
+  };
+  
+  const updateUser = (updatedUserData: User) => {
+    setUser(updatedUserData);
+    setUsers(prevUsers => prevUsers.map(u => u.id === updatedUserData.id ? updatedUserData : u));
+  }
 
   const handleNavigate = (page: Page) => {
-    if (page === Page.Login) {
-        setIsLoginView(true);
-        setCurrentPage(Page.Login);
-    } else if (page === Page.Signup) {
-        setIsLoginView(false);
-        setCurrentPage(Page.Signup);
-    } else {
-        setCurrentPage(page);
-    }
+    setCurrentPage(page);
   };
 
-  const renderPage = () => {
+  const authContextValue = useMemo(() => ({ user, login, logout, updateUser }), [user]);
+  const dataContextValue = useMemo(() => ({ connections, setConnections, agents, setAgents, leads, setLeads, leadGroups, setLeadGroups, campaigns, setCampaigns, users, setUsers }), [connections, agents, leads, leadGroups, campaigns, users]);
+
+
+  const renderContent = () => {
     if (!user) {
-        switch (currentPage) {
-            case Page.Login:
-            case Page.Signup:
-                return <AuthScreen isLogin={isLoginView} onSwitch={() => handleNavigate(isLoginView ? Page.Signup : Page.Login)} onNavigate={handleNavigate} />;
-            case Page.Landing:
-            default:
-                return <LandingScreen onNavigate={handleNavigate} />;
-        }
+      switch (currentPage) {
+        case Page.Login:
+          return <AuthScreen isLogin={true} onSwitch={() => handleNavigate(Page.Signup)} onNavigate={handleNavigate} />;
+        case Page.Signup:
+          return <AuthScreen isLogin={false} onSwitch={() => handleNavigate(Page.Login)} onNavigate={handleNavigate} />;
+        case Page.Landing:
+        default:
+          return <LandingScreen onNavigate={handleNavigate} />;
+      }
     }
 
-    const pages: Record<Page, React.ReactNode> = {
-      [Page.Dashboard]: <DashboardScreen />,
-      [Page.Connections]: <ConnectionsScreen />,
-      [Page.Agents]: <AgentsScreen />,
-      [Page.Leads]: <LeadsScreen />,
-      [Page.Campaigns]: <CampaignsScreen />,
-      [Page.Reports]: <ReportsScreen />,
-      [Page.Settings]: <SettingsScreen />,
-      // These are handled by the !user block
-      [Page.Landing]: null,
-      [Page.Login]: null,
-      [Page.Signup]: null,
-    };
+    // Authenticated user content
+    let screenContent: React.ReactNode;
+    switch (currentPage) {
+        case Page.Dashboard:
+            screenContent = <DashboardScreen />;
+            break;
+        case Page.Connections:
+            screenContent = <ConnectionsScreen />;
+            break;
+        case Page.Agents:
+            screenContent = <AgentsScreen />;
+            break;
+        case Page.Leads:
+            screenContent = <LeadsScreen />;
+            break;
+        case Page.Campaigns:
+            screenContent = <CampaignsScreen />;
+            break;
+        case Page.Reports:
+            screenContent = <ReportsScreen />;
+            break;
+        case Page.Settings:
+            screenContent = <SettingsScreen />;
+            break;
+        default:
+            setCurrentPage(Page.Dashboard); // Fallback to dashboard
+            screenContent = <DashboardScreen />;
+    }
     
-    return (
-        <Layout onNavigate={handleNavigate} currentPage={currentPage}>
-            {pages[currentPage]}
-        </Layout>
-    );
+    return <Layout onNavigate={handleNavigate} currentPage={currentPage}>{screenContent}</Layout>;
   };
-
+  
   return (
     <AuthContext.Provider value={authContextValue}>
-      <DataContext.Provider value={dataContextValue}>
-        {renderPage()}
-      </DataContext.Provider>
+        <DataContext.Provider value={dataContextValue}>
+            {renderContent()}
+        </DataContext.Provider>
     </AuthContext.Provider>
   );
 };
